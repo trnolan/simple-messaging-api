@@ -1,0 +1,29 @@
+version: '3.2'
+
+services:
+  postgres:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: messaging_db
+    ports:
+      - 5432:5432
+    
+  amqp:
+    image: rabbitmq:latest
+    environment:
+      RABBITMQ_DEFAULT_USER: amqp
+      RABBITMQ_DEFAULT_PASS: amqp
+    ports:
+      - 5672:5672
+      - 15672:15672
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile.python
+    environment:
+      SERVICE_NAME: simple-messaging-api
+      PYTHONUNBUFFERED: 0   
