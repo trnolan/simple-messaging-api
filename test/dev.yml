@@ -12,7 +12,7 @@ services:
       - 5432:5432
     
   amqp:
-    image: rabbitmq:latest
+    image: rabbitmq:3-management
     environment:
       RABBITMQ_DEFAULT_USER: amqp
       RABBITMQ_DEFAULT_PASS: amqp
@@ -20,10 +20,25 @@ services:
       - 5672:5672
       - 15672:15672
 
+  infra-wait:
+    image: waisbrot/wait
+    depends_on:
+      - amqp
+      - postgres
+    environment:
+      - TARGETS=amqp:5672,postgres:5432
+
   app:
     build:
       context: ..
       dockerfile: Dockerfile.python
     environment:
       SERVICE_NAME: simple-messaging-api
-      PYTHONUNBUFFERED: 0   
+      PYTHONUNBUFFERED: 0
+      HTTP_PORT: 8080
+      FLASK_ENV: development
+      LOG_LEVEL: debug
+    ports:
+      - 8080:8080
+    volumes:
+      - ../:/app

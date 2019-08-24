@@ -7,6 +7,7 @@ RUN apk update && apk add \
   curl \
   gcc \
   gettext \
+  git \
   make \
   musl-dev \
   postgresql-dev \
@@ -17,4 +18,4 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD [ "python", "-u", "./app.py" ]
+CMD [ "python", "-u", "./run.py" ]
