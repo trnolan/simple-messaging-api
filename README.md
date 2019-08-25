@@ -18,5 +18,6 @@ Flask service with 4 endpoints:
 - Endpoint for subscribing to chat rooms.
 - Database connection. For keeping track of username/password combos, subscription to chat rooms, history of messages, prevent duplicate usernames, etc.
 - CQRS pattern for separating database reads/writes from API operations.
+- Clean up the rabbitmq connection handling. (Something like a `with` that `yields` a connection and closes it would work well here)
 - Testing
 - Improved logging/error handling
