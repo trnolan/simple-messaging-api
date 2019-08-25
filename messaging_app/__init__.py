@@ -5,13 +5,32 @@ import logging
 # 3p
 from flask import Flask, request
 from flask.json import jsonify
+from flask_jwt import JWT, jwt_required
 import json
 import pika
 
 
 app = Flask(__name__)
 params = pika.ConnectionParameters(host='amqp', credentials=pika.PlainCredentials(username='amqp', password='amqp'), port=5672)
-rabbitmq_connection = pika.BlockingConnection(parameters=params)
+app.config.update(
+    SECRET_KEY=os.environ.get('JWT_USER_SECRET'),
+    JWT_AUTH_HEADER_PREFIX='Bearer',
+    JWT_REQUIRED_CLAIMS=[])
+
+
+def _auth_handler():
+    """
+    Requrired JWT method
+    """
+    return None
+
+def _identity_handler(jwt_payload):
+    """
+    Required JWT method
+    """
+    return jwt_payload
+
+jwt = JWT(app, _auth_handler, _identity_handler)
 
 def _format_error(error_message, status_code=None):
     response = jsonify({
@@ -31,14 +50,38 @@ def _format_result(result):
     logging.info(f"Responding with 200: {response}")
     return response
 
+def _rabbitmq_helper():
+    """
+    Helper method that establishes a connection with rabbitmq and returns
+    a channel to work with
+    """
+    rabbitmq_connection = pika.BlockingConnection(parameters=params)
+    return rabbitmq_connection.channel()
+
+def _send_message_helper(message, destination, sender, chat_name='private'):
+    """
+    Helper method to format and send message over rabbitmq
+    """
+    body = {"message": message, "timestamp": str(datetime.datetime.utcnow()), "chat_name": chat_name, "sender": sender}
+    rabbitmq_channel = _rabbitmq_helper()
+    rabbitmq_channel.basic_publish(exchange='amq.topic', routing_key=destination, body=json.dumps(body))
+    rabbitmq_channel.close()
+
+
 @app.route('/sign-up', methods=['POST'])
+@jwt_required()
 def sign_up():
+    """
+    Accepts a JSON payload with a string username and returns 200 if username queue can be created
+    Ex: {"username": "foo"}
+    """
     data = request.get_json()
     username = data.get('username')
     if not username:
         return _format_error("Username required", 400)
     try:
-        rabbitmq_channel = rabbitmq_connection.channel()
+        rabbitmq_channel = _rabbitmq_helper()
+        # TODO: Add check to see if username is taken already
         rabbitmq_channel.queue_declare(queue=username)
         rabbitmq_channel.queue_bind(queue=username, exchange='amq.topic', routing_key=username)
         rabbitmq_channel.close()
@@ -47,9 +90,14 @@ def sign_up():
     return _format_result(f"Successfully signed up user {username}")
 
 @app.route('/send-message', methods=['POST'])
+@jwt_required()
 def send_message():
+    """
+    Accepts a json payload with keys message, recipient and sender
+    Ex: {"recipient": "foo", "message": "hi", "sender": "bar"}
+    """
     data = request.get_json()
-    destination = data.get('username')
+    destination = data.get('recipient')
     message = data.get('message')
     sender = data.get('sender')
     try:
@@ -59,9 +107,14 @@ def send_message():
     return _format_result(f"Successfully sent message to {destination}")
 
 @app.route('/group-message', methods=['POST'])
+@jwt_required()
 def send_group_mesage():
+    """
+    Accepts a json payload with keys chat_name, message, recipients, and sender
+    Ex: {"chat_name": "team", "recipients": ["foo", "test"], "message": "hi", "sender": "bar"}
+    """
     data = request.get_json()
-    destinations = data.get('usernames')
+    destinations = data.get('recipients')
     chat_name = data.get('chat_name')
     message = data.get('message')
     sender = data.get('sender')
@@ -72,16 +125,15 @@ def send_group_mesage():
             return _format_error(f"Error sending message to {username}")
     return _format_result(f"Successfully sent message to {str(destinations)}")
 
-def _send_message_helper(message, destination, sender, chat_name='private'):
-    rabbitmq_channel = rabbitmq_connection.channel()
-    body = {"message": message, "timestamp": str(datetime.datetime.utcnow()), "chat_name": chat_name, "sender": sender}
-    rabbitmq_channel.basic_publish(exchange='amq.topic', routing_key=destination, body=json.dumps(body))
-    rabbitmq_channel.close()
 
 @app.route('/get-messages/<username>', methods=['GET'])
+@jwt_required()
 def get_messages(username):
+    """
+    GET endpoint which expects a single username parameter
+    """
     messages = []
-    channel = rabbitmq_connection.channel()
+    channel = _rabbitmq_helper()
     messages_left = True
     # Get messages until the get returns None
     while messages_left:
