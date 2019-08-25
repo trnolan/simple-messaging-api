@@ -1,6 +1,7 @@
 # stdlib
 import datetime
 import logging
+import os
 
 # 3p
 from flask import Flask, request
@@ -106,7 +107,7 @@ def send_message():
         return _format_error(f"Error sending message to {destination}") 
     return _format_result(f"Successfully sent message to {destination}")
 
-@app.route('/group-message', methods=['POST'])
+@app.route('/send-group-message', methods=['POST'])
 @jwt_required()
 def send_group_mesage():
     """

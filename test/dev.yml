@@ -38,6 +38,7 @@ services:
       HTTP_PORT: 8080
       FLASK_ENV: development
       JWT_USER_SECRET: test
+      JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJoaSI6ImhpIn0.wP5AXhww2k_oLZZIGXAoCdJflLzU4h6A-SjBvgK1tpQ
       LOG_LEVEL: debug
     ports:
       - 8080:8080
